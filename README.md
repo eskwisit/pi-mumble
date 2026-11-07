@@ -66,6 +66,7 @@ Mumble makes no network requests and runs no programs. It writes the originals t
 ## Limits
 
 - The model decides how well it obeys the voice rules. Mumble does not check the replies.
+- Shorter answers can lose facts. In a test on two Google models, the `ste` voice kept 25 to 28 of 40 core facts.
 - The counter is in memory. It starts at zero in each new session.
 - The token values are estimates: 4 characters for each token.
 

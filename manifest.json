@@ -2,7 +2,7 @@
 	"schemaVersion": 1,
 	"id": "eskwisit.mumble",
 	"name": "Mumble",
-	"version": "0.1.0",
+	"version": "0.5.0",
 	"description": "Cuts the token cost of each agent session. The agent says less: short answers in ASD-STE100. The agent reads less: large logs, JSON, tables and terminal output shrink before the model reads them, and the exact original stays available.",
 	"author": "eskwisit",
 	"license": "Apache-2.0",
@@ -11,7 +11,7 @@
 	"categories": ["coding"],
 	"main": "main.js",
 	"safetyNotes": "agent.extension loads one agent module in each session. Before each turn, it puts a Mumble section at the start of the system prompt: the voice rules (ste by default, or mumble, ultra, off) and a note about shrunk tool results. If your message asks for a voice change (for example /mumble ultra, stop mumble, normal mode), it changes the voice. After each tool call, a text result above 3000 characters can shrink: JSON arrays, logs, tables and terminal output keep their errors, unusual entries, start and end, and a summary of the removed part. Text above 20000 characters keeps its start and its end. Before it shrinks a result, it writes the exact original to a temporary folder (pi-mumble in the temporary folder of your system), readable only by you, at most 64 MB in each session. It removes that folder when the session ends, and folders older than one day at the next start. If it cannot write the original, it does not shrink. It does not shrink the results of Read, Edit, Write, Skill, Task, TaskWait, TodoWrite, asktool and its own tool. It never blocks a tool. It adds the mumble_retrieve tool: it reads an original of this session, all of it, a line range or the lines that match a regex. At the end of each turn, it adds the token counts and the cost of the reply to a counter in memory. The /mumble command shows the counter and changes the voice, the mode and the limit. These changes go to pi-mumble/config.json in ~/.config (macOS, Linux) or %APPDATA% (Windows). Mode off stops all changes. The plugin makes no network requests and runs no programs. Credit: parts are adapted from github.com/JuliusBrussee/caveman by Julius Brussee (Apache-2.0); see NOTICE.",
-	"changelog": "First release: STE voice, shrunk tool output with exact recovery, and a session cost counter.",
+	"changelog": "First release: short answers in ASD-STE100, shrunk tool output with exact recovery, and a session cost counter.",
 	"contributes": {
 		"agentExtensions": ["extension/mumble.js"]
 	},
