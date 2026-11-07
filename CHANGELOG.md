@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.3
+
+### Fixes
+
+- **extension:** add the prompt section to each request, not to the stored prompt (`0c8f12d`)
+
+### Tests
+
+- cover the request payload shapes and the unchanged stored prompt (`e7558b8`)
+
 ## 0.5.2
 
 ### Fixes
