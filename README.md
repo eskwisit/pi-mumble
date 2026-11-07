@@ -1,7 +1,18 @@
 # Mumble
 
 Mumble decreases the token cost of each PI-Desktop agent session.
-It starts with each session. You do not start it.
+
+**Why the cost goes down.** The provider bills each turn of an agent session by tokens:
+
+- **Output tokens:** the text that the model writes. They usually cost more than input tokens.
+- **Input tokens:** the system prompt, the full chat history and all tool results. The agent sends all of them again in each turn.
+
+Mumble decreases both:
+
+- **Shorter replies** decrease the output tokens.
+- **Smaller tool results** decrease the input tokens. A tool result stays in the history, so each result that Mumble shrinks costs less in that turn and in all later turns.
+
+**Why you do not start it.** Mumble is an agent extension. PI-Desktop loads it at the start of each session, so it works in each new session without a command.
 
 Credit: Mumble uses code adapted from [github.com/JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) by Julius Brussee (Apache-2.0, see [NOTICE](NOTICE)). Mumble is not affiliated with Julius Brussee, and Julius Brussee does not endorse it.
 
