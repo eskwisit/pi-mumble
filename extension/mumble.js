@@ -10,7 +10,8 @@ import os from "node:os";
 import path from "node:path";
 import { shrink } from "./shrink.js";
 import { createStore, retrieve, sweep } from "./store.js";
-import { MARKER, VOICES, parseModeChange, section } from "./voice.js";
+import { addToSystemPrompt } from "./system-prompt.js";
+import { VOICES, parseModeChange, section } from "./voice.js";
 
 export const MODES = ["on", "off"];
 export const DEFAULTS = Object.freeze({
@@ -123,11 +124,17 @@ export default function mumble(pi) {
 		if (cfg.mode === "off") return;
 		const change = parseModeChange(event?.prompt, cfg.voice);
 		if (change?.action === "set") voice = change.voice;
-		const prompt = event?.systemPrompt;
-		if (typeof prompt !== "string" || prompt.includes(MARKER)) return;
+		// No systemPrompt here: PI-Desktop stores a changed prompt as a new system message, and
+		// Anthropic models then get the whole prompt twice. before_provider_request adds the section.
+	});
+
+	pi.on("before_provider_request", async (event) => {
+		if (readConfig().mode === "off") return;
+		const payload = event?.payload;
 		// At the start, not the end: the host changes later parts of its prompt during a session,
 		// and the prompt cache keeps only the part before the first change.
-		return { systemPrompt: `${section(voice)}\n\n${prompt}` };
+		if (!addToSystemPrompt(payload, section(voice), "start")) return;
+		return payload;
 	});
 
 	pi.on("tool_result", async (event) => {
