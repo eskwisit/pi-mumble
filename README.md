@@ -46,6 +46,38 @@ The test samples are in [the tests](tests/mumble.test.mjs). Your results will be
 
 Mumble shrinks only results above 3,000 characters. It does not shrink the results of Read, Edit, Write, Skill, Task, TaskWait, TodoWrite, asktool and `mumble_retrieve`. It does not shrink JSON with numbers that JavaScript cannot keep exactly, for example `12345678901234567890`.
 
+## Benchmark
+
+This test compares Mumble 0.5.0 with the upstream project, [github.com/JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) 4.1.0. It used the upstream prompt sets and scorer: 10 developer questions and 30 fidelity cases. Each case ran once on two Google models (`gemma-4-31b-it`, `gemini-3.1-flash-lite`), in the pi agent without tools. Claude was not available because of a rate limit.
+
+**Answers (voice only)**
+
+| Measure | Upstream | Mumble `ste` | Mumble `mumble` |
+| --- | ---: | ---: | ---: |
+| Output tokens, compared with "Answer concisely." | 70% to 78% fewer | 84% to 86% fewer | 85% to 91% fewer |
+| System prompt tokens added to each call | 1,196 | 422 | 371 |
+| Core facts kept (of 40) | 35 to 39 | 25 to 28 | 28 to 33 |
+| Fidelity checks passed (of 30) | 25 | 24 to 25 | 18 to 21 |
+| Cost of the 30 fidelity cases (flash-lite, control $0.0111) | $0.0153 | $0.0096 | $0.0084 |
+
+- On short answers, the larger system prompt costs more than the upstream output savings. On the fidelity set, the upstream voice cost more than the control.
+- Only the `ste` voice writes full STE sentences: 13 to 16 articles for each 100 words, and no semicolons.
+- The `ste` voice gives shorter answers but drops facts. For example, it named no causes of a memory leak.
+
+**Tool output (same 15 inputs)**
+
+| Measure | Upstream | Mumble |
+| --- | ---: | ---: |
+| Facts kept in the shrunk text (of 31) | 31 | 31 |
+| Total size cut | 39.4% | 77.7% |
+| Total size cut, without a 114,788-character git log | 72.6% | 73.7% |
+
+- Logs, terminal output, JSON and CSV give almost the same result, because Mumble uses the same method.
+- The upstream engine also shrinks inputs below 3,000 characters and YAML. Mumble does not.
+- Mumble cuts large text of an unknown type. The upstream engine does not change it.
+
+**Limits of this test.** It used two Google models, one run for each case and small sets (10 and 30). The results on Claude can be different. The test did not run the upstream proxy or its per-turn context.
+
 ## Commands
 
 | Command | Result |
