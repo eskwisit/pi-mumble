@@ -3,7 +3,7 @@
 	"id": "eskwisit.mumble",
 	"name": "Mumble",
 	"version": "0.5.1",
-	"description": "Cuts the token cost of each agent session. The agent says less: short answers in ASD-STE100. The agent reads less: large logs, JSON, tables and terminal output shrink before the model reads them, and the exact original stays available.",
+	"description": "Mumble for PI-Desktop cuts the talk, not the facts. Code and errors stay exact. Each original is one call away.",
 	"author": "eskwisit",
 	"license": "Apache-2.0",
 	"homepage": "https://github.com/eskwisit/pi-mumble",
@@ -13,12 +13,12 @@
 	"i18n": {
 		"en": {
 			"name": "Mumble",
-			"description": "Cuts the token cost of each agent session. The agent says less: short answers in ASD-STE100. The agent reads less: large logs, JSON, tables and terminal output shrink before the model reads them, and the exact original stays available.",
+			"description": "Mumble for PI-Desktop cuts the talk, not the facts. Code and errors stay exact. Each original is one call away.",
 			"safetyNotes": "agent.extension loads one agent module in each session. Before each turn, it puts a Mumble section at the start of the system prompt: the voice rules (ste by default, or mumble, ultra, off) and a note about shrunk tool results. If your message asks for a voice change (for example /mumble ultra, stop mumble, normal mode), it changes the voice. After each tool call, a text result above 3000 characters can shrink: JSON arrays, logs, tables and terminal output keep their errors, unusual entries, start and end, and a summary of the removed part. Text above 20000 characters keeps its start and its end. Before it shrinks a result, it writes the exact original to a temporary folder (pi-mumble in the temporary folder of your system), readable only by you, at most 64 MB in each session. It removes that folder when the session ends, and folders older than one day at the next start. If it cannot write the original, it does not shrink. It does not shrink the results of Read, Edit, Write, Skill, Task, TaskWait, TodoWrite, asktool and its own tool. It never blocks a tool. It adds the mumble_retrieve tool: it reads an original of this session, all of it, a line range or the lines that match a regex. At the end of each turn, it adds the token counts and the cost of the reply to a counter in memory. The /mumble command shows the counter and changes the voice, the mode and the limit. These changes go to pi-mumble/config.json in ~/.config (macOS, Linux) or %APPDATA% (Windows). Mode off stops all changes. The plugin makes no network requests and runs no programs. Credit: parts are adapted from github.com/JuliusBrussee/caveman by Julius Brussee (Apache-2.0); see NOTICE."
 		},
 		"zh-CN": {
 			"name": "Mumble",
-			"description": "降低每个智能体会话的 token 成本。智能体说得更少：用 ASD-STE100 写简短的回答。智能体读得更少：大型日志、JSON、表格和终端输出在模型读取前被压缩，确切的原文仍可取回。",
+			"description": "PI-Desktop 版 Mumble 删减废话，不删事实。代码和错误信息保持原样。每份原文一次调用即可取回。",
 			"safetyNotes": "agent.extension 在每个会话中加载一个智能体模块。每轮对话前，它在系统提示的开头加入一段 Mumble 说明：语气规则（默认 ste，也可选 mumble、ultra、off）以及关于已压缩工具结果的说明。如果你的消息要求切换语气（例如 /mumble ultra、stop mumble、normal mode），它会切换语气。每次工具调用后，超过 3000 个字符的文本结果可能被压缩：JSON 数组、日志、表格和终端输出会保留错误、异常条目、开头和结尾，并为删除的部分写一段摘要。超过 20000 个字符的文本只保留开头和结尾。压缩结果之前，它会把确切的原文写入临时文件夹（系统临时文件夹中的 pi-mumble），只有你能读取，每个会话最多 64 MB。会话结束时删除该文件夹，下次启动时删除超过一天的文件夹。如果无法写入原文，它就不压缩。它不压缩 Read、Edit、Write、Skill、Task、TaskWait、TodoWrite、asktool 以及它自己的工具的结果。它从不阻止工具。它添加 mumble_retrieve 工具：读取本会话的原文，可读取全部、一个行范围或匹配正则表达式的行。每轮结束时，它把回复的 token 数和费用加到内存中的计数器。/mumble 命令显示计数器，并可更改语气、模式和上限。这些更改写入 ~/.config（macOS、Linux）或 %APPDATA%（Windows）下的 pi-mumble/config.json。off 模式停止所有更改。插件不发起网络请求，也不运行任何程序。致谢：部分代码改编自 Julius Brussee 的 github.com/JuliusBrussee/caveman（Apache-2.0）；见 NOTICE。"
 		}
 	},
