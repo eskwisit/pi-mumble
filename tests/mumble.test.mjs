@@ -365,6 +365,9 @@ test("manifest: files exist, one permission, starts with each session, notes the
 	assert.deepEqual(m.activationEvents, ["onStartup"]);
 	for (const s of ["agent.extension", "/mumble", "mumble_retrieve", "temporary folder", "config.json", "JuliusBrussee/caveman"]) assert.ok(m.safetyNotes.includes(s), s);
 	assert.ok(fs.existsSync(path.join(ROOT, "NOTICE")));
+	for (const lang of ["en", "zh-CN"]) for (const key of ["name", "description", "safetyNotes"]) assert.ok(m.i18n[lang][key], `${lang}.${key}`);
+	for (const key of ["name", "description", "safetyNotes"]) assert.equal(m.i18n.en[key], m[key], `en.${key}`);
+	for (const s of ["agent.extension", "/mumble", "mumble_retrieve", "pi-mumble/config.json"]) assert.ok(m.i18n["zh-CN"].safetyNotes.includes(s), `zh-CN: ${s}`);
 });
 
 test("the name caveman appears only in credits", () => {
@@ -373,6 +376,7 @@ test("the name caveman appears only in credits", () => {
 		fs.readFileSync(path.join(ROOT, f), "utf8").split("\n").forEach((line, i) => {
 			const rest = line
 				.replace(/Credit: .*?JuliusBrussee\/caveman.*?[Ss]ee NOTICE\./g, "")
+				.replace(/致谢：.*?JuliusBrussee\/caveman.*?见 NOTICE。/g, "")
 				.replace(/\[github\.com\/JuliusBrussee\/caveman\]\(https:\/\/github\.com\/JuliusBrussee\/caveman\)/g, "");
 			assert.doesNotMatch(rest, /caveman|ultracave/i, `${f}:${i + 1}: ${line.slice(0, 120)}`);
 		});
