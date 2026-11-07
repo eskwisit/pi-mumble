@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.2
+
+### Fixes
+
+- **manifest:** rewrite the description in a short, clear form (`f7845e2`)
+
+### Documentation
+
+- **readme:** add the tagline under the title (`04c74dc`)
+
 ## 0.5.1
 
 ### Fixes
