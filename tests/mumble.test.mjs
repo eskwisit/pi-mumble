@@ -275,19 +275,65 @@ test("section: voice text plus the shrink note; off keeps only the note", () => 
 
 // ------------------------------------------------------------------ extension
 
-test("before_agent_start: prepends the section once; prompt phrases switch the voice", async () => {
+test("before_agent_start: never changes the system prompt; prompt phrases switch the voice", async () => {
 	resetConfig();
 	const pi = fakePi();
-	const r = await pi.emit("before_agent_start", { prompt: "fix it", systemPrompt: "BASE" });
-	assert.equal(r.systemPrompt, `${vo.section("ste")}\n\nBASE`);
-	assert.equal(await pi.emit("before_agent_start", { prompt: "x", systemPrompt: r.systemPrompt }), undefined);
-	const off = await pi.emit("before_agent_start", { prompt: "stop mumble", systemPrompt: "BASE" });
-	assert.equal(off.systemPrompt, `${vo.SHRINK_NOTE}\n\nBASE`);
-	const ultra = await pi.emit("before_agent_start", { prompt: "/mumble ultra", systemPrompt: "BASE" });
-	assert.match(ultra.systemPrompt, /Mumble voice: ultra/);
+	const req = () => pi.emit("before_provider_request", { payload: { system: [{ type: "text", text: "BASE" }], messages: [] } });
+	assert.equal(await pi.emit("before_agent_start", { prompt: "fix it", systemPrompt: "BASE" }), undefined);
+	assert.equal((await req()).system[0].text, `${vo.section("ste")}\n\nBASE`);
+	assert.equal(await pi.emit("before_agent_start", { prompt: "stop mumble", systemPrompt: "BASE" }), undefined);
+	assert.equal((await req()).system[0].text, `${vo.SHRINK_NOTE}\n\nBASE`);
+	await pi.emit("before_agent_start", { prompt: "/mumble ultra", systemPrompt: "BASE" });
+	assert.match((await req()).system[0].text, /^<!-- mumble -->\n## Mumble voice: ultra/);
 	ext.writeConfig({ mode: "off" });
 	assert.equal(await pi.emit("before_agent_start", { prompt: "x", systemPrompt: "BASE" }), undefined);
+	assert.equal(await req(), undefined);
 	resetConfig();
+});
+
+test("before_provider_request: puts the section at the start of the PI-Desktop prompt, once", async () => {
+	resetConfig();
+	const pi = fakePi();
+	const s = vo.section("ste");
+	// Anthropic with OAuth: block 0 is the fixed Claude Code line and stays as it is.
+	const payload = { system: [{ type: "text", text: "CLAUDE" }, { type: "text", text: "BASE", cache_control: { type: "ephemeral" } }], messages: [{ role: "user", content: "hi" }] };
+	const r = await pi.emit("before_provider_request", { payload });
+	assert.equal(r, payload, "same object, changed in place");
+	assert.equal(r.system[0].text, "CLAUDE");
+	assert.equal(r.system[1].text, `${s}\n\nBASE`);
+	assert.deepEqual(r.system[1].cache_control, { type: "ephemeral" });
+	await pi.emit("before_provider_request", { payload });
+	assert.equal(payload.system[1].text, `${s}\n\nBASE`, "a retry does not add it twice");
+	// Mid-conversation system messages stay as they are.
+	const mid = { system: "BASE", messages: [{ role: "system", content: [{ type: "text", text: "UPDATE" }] }] };
+	await pi.emit("before_provider_request", { payload: mid });
+	assert.equal(mid.system, `${s}\n\nBASE`);
+	assert.equal(mid.messages[0].content[0].text, "UPDATE");
+	assert.equal(await pi.emit("before_provider_request", { payload: { messages: [{ role: "user", content: "hi" }] } }), undefined);
+	assert.equal(await pi.emit("before_provider_request", {}), undefined);
+});
+
+test("addToSystemPrompt: each provider payload shape", async () => {
+	const { addToSystemPrompt: add } = await load("system-prompt.js");
+	const cases = [
+		[{ instructions: "BASE", input: [] }, (p) => p.instructions],
+		[{ systemInstruction: "BASE", contents: [] }, (p) => p.systemInstruction],
+		[{ systemInstruction: { parts: [{ text: "BASE" }] } }, (p) => p.systemInstruction.parts[0].text],
+		[{ messages: [{ role: "system", content: "BASE" }, { role: "user", content: "hi" }] }, (p) => p.messages[0].content],
+		[{ messages: [{ role: "developer", content: [{ type: "text", text: "BASE" }] }] }, (p) => p.messages[0].content[0].text],
+		[{ input: [{ role: "developer", content: "BASE" }, { role: "user", content: "hi" }] }, (p) => p.input[0].content],
+		[{ input: [{ role: "system", content: [{ type: "input_text", text: "BASE" }] }] }, (p) => p.input[0].content[0].text],
+	];
+	for (const [payload, get] of cases) {
+		assert.equal(add(payload, "<S>", "start"), true, JSON.stringify(payload));
+		assert.equal(get(payload), "<S>\n\nBASE");
+		assert.equal(add(payload, "<T>", "end"), true);
+		assert.equal(get(payload), "<S>\n\nBASE\n\n<T>");
+	}
+	assert.equal(add({ messages: [{ role: "user", content: "BASE" }] }, "<S>"), false, "never edits a user message");
+	assert.equal(add({ system: [{ type: "image" }] }, "<S>"), false);
+	assert.equal(add(null, "<S>"), false);
+	assert.equal(add({ system: "BASE" }, ""), false);
 });
 
 test("tool_result: shrinks, keeps images, adds the id; retrieve gives the exact lines back", async () => {
