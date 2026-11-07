@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.1
+
+### Fixes
+
+- **manifest:** add english and chinese texts like the other plugins (`7e3720c`)
+
+### Documentation
+
+- **readme:** add the benchmark against the upstream project (`c73bf88`)
+- **readme:** explain why the cost goes down and why it starts itself (`8232c6b`)
+
+### Tests
+
+- check manifest translations and the chinese credit (`bca5626`)
+
 ## 0.5.0
 
 ### Features
