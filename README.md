@@ -1,5 +1,7 @@
 # Mumble
 
+**Mumble for PI-Desktop cuts the talk, not the facts. Code and errors stay exact. Each original is one call away.**
+
 Mumble decreases the token cost of each PI-Desktop agent session.
 
 **Why the cost goes down.** The provider bills each turn of an agent session by tokens:
