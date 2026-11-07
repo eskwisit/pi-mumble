@@ -1,0 +1,18 @@
+Mumble
+Copyright 2025 eskwisit
+
+This product includes software adapted from Caveman
+(https://github.com/JuliusBrussee/caveman), version 4.1.0, commit c310c9d.
+Copyright 2026 Julius Brussee. Licensed under the Apache License, Version 2.0.
+
+Adapted parts, rewritten in JavaScript and changed:
+- extension/shrink.js: from engine/compressors (log.go, terminal.go, tabular.go,
+  json.go, redundancy.go, invariants.go, lineends.go) and engine/detect.go.
+- extension/voice.js: the caveman and ultra voice texts from skills/caveman,
+  skills/ultracave and src/rules/caveman-activate.md, and the trigger parser
+  from src/hooks/caveman-parse.js. In Mumble, these are the mumble and ultra
+  voices and the /mumble triggers.
+- extension/store.js: the recovery contract of the CCR store (no original on
+  disk, no lossy output). The code is new.
+
+The "ste" voice and the head-and-tail cut are not from Caveman.
