@@ -29,10 +29,10 @@ Credit: Mumble uses code adapted from [github.com/JuliusBrussee/caveman](https:/
 
 | Voice | Rules | Prompt size |
 | --- | --- | ---: |
-| `ste` (default) | ASD-STE100: answer first, no filler, 20 words for each instruction, 25 words for each description, active voice, articles kept, no semicolons. | about 420 tokens |
-| `mumble` | Terse: answer first, no filler, articles optional. | about 380 tokens |
-| `ultra` | Most terse: fragments, each fact once. | about 235 tokens |
-| `off` | No voice rules. Only the note about shrunk results stays. | about 85 tokens |
+| `ste` (default) | ASD-STE100: answer first, no filler, 20 words for each instruction, 25 words for each description, active voice, articles kept, no semicolons. | about 375 tokens |
+| `mumble` | Terse: answer first, no filler, articles optional. | about 325 tokens |
+| `ultra` | Most terse: fragments, each fact once. | about 200 tokens |
+| `off` | No voice rules. Only the note about shrunk results stays. | about 65 tokens |
 
 The voice text does not change from turn to turn, so the prompt cache stores it.
 
