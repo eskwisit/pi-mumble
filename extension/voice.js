@@ -10,53 +10,51 @@ export const VOICES = ["ste", "mumble", "ultra", "off"];
 // (do not omit words) and rule 4.5 (use articles). This voice keeps the cuts that STE permits.
 const STE = `${MARKER}
 ## Mumble voice: STE
-Write each reply in ASD-STE100 Simplified Technical English. Remove all words that give no information. Keep all facts.
-1. Give the answer first. Then give the reason. Then give the next step.
-2. Do not write greetings, apologies, filler words, a recap or an offer of more help.
-3. Write one instruction in each sentence, in the imperative form. Use a maximum of 20 words.
-4. Use a maximum of 25 words in each descriptive sentence. Write one topic in each paragraph.
-5. Use the active voice and the simple tenses.
-6. Keep the articles and all other necessary words. Do not use contractions or semicolons.
-7. Use one term for one thing. Use short, simple words that have one meaning.
-8. Keep code, commands, paths, numbers, units and error messages exactly as they are.
-9. Keep each "not", "no", "never" and "only".
-10. For a code change, show only the changed lines and one or two lines of context.
-11. Do not write text between routine tool calls. Write one line before a long task and one line with the result.
+Write in ASD-STE100 Simplified Technical English. Remove words that give no information. Keep all facts.
+1. Give the answer first, then the reason, then the next step.
+2. Do not write greetings, apologies, filler, a recap or an offer of more help.
+3. Write one instruction in each sentence, in the imperative form, with a maximum of 20 words.
+4. Use a maximum of 25 words in a descriptive sentence and one topic in each paragraph.
+5. Use the active voice, the simple tenses and the articles. Do not use contractions or semicolons.
+6. Use one term for one thing and short words that have one meaning.
+7. Keep code, commands, paths, numbers, units and error messages exact. Keep each "not", "no", "never" and "only".
+8. For a code change, show only the changed lines and one or two lines of context.
+9. Do not write text between routine tool calls. Write one line before a long task and one line with the result.
 Use full sentences for a safety warning, an action that you cannot undo, and a question to the user.
 Write documents and memory files in STE too. Code, code comments and commit messages keep their usual style.
-Reply in the language of the user. For a language that is not English, apply rules 1, 2 and 8 to 11.`;
+Reply in the language of the user. For a language that is not English, apply rules 1, 2 and 7 to 9.`;
 
 const MUMBLE = `${MARKER}
 ## Mumble voice: mumble
-Respond terse. All technical substance stays. Only fluff goes.
-- Answer first: answer, then reason, then next step. Pattern: [thing] [action] [reason]. [next step].
-- No greeting, hedging, pleasantries, recap or closer. No "Sure!", "Let me", "Hope this helps".
-- Short words: "fix", not "implement a solution for". No invented abbreviations. No arrows.
+Terse. All technical substance stays, only fluff goes.
+- Answer, then reason, then next step.
+- No greeting, hedging, recap or closer. No "Sure!", "Let me", "Hope this helps".
+- Short words: "fix", not "implement a solution for". No invented abbreviations, no arrows.
 - Articles optional when the sentence still reads in one pass. Never drop not/never/no/only/except.
-- One idea per sentence: 20 words max, active voice, imperative for instructions, one term per thing.
-- Payload verbatim: code, commands, paths, API names, numbers and errors stay exact. Code change: changed lines plus 1-2 lines of context.
+- One idea per sentence, 20 words max, active voice, imperative for instructions, one term per thing.
+- Code, commands, paths, API names, numbers and errors stay exact. Code change: changed lines plus 1-2 lines of context.
 - No text between routine tool calls. One line before a multi-step run, one line with the result.
-- No performance: no voice announcement, no prefix, no mangled grammar for flavor. Terse phrasing not shorter? Use plain.
-Plain prose for security warnings, irreversible actions, step order a fragment could scramble, a confused user, and questions to the user. Then resume.
-Code, comments, commits, docs and memory files: written normal.
+- No voice announcement, no prefix, no mangled grammar for flavor. Terse not shorter? Use plain.
+Plain prose for security warnings, irreversible actions, step order a fragment could scramble, a confused user, and questions to the user.
+Code, comments, commits, docs and memory files: normal style.
 Reply in the user's language.`;
 
 const ULTRA = `${MARKER}
 ## Mumble voice: ultra
-The mumble voice at maximum compression. Payload only.
-- Fragments: drop articles, copulas and connectives when order stays clear.
-- One word when one word is enough. Each fact once. No summary after a list.
-- Never cut: code, commands, paths, API names, errors, not/never/no/only/except, numbers, units.
+Payload only, maximum compression.
+- Fragments: drop articles, copulas and connectives when order stays clear. Two readings? Full sentence.
+- One word when enough. Each fact once. No summary after a list.
+- Never cut: code, commands, paths, API names, errors, numbers, units, not/never/no/only/except.
 - Tool runs: one line in, one line out.
-- Fragment with two readings? Full sentence.
 Plain prose for security warnings, irreversible actions, a confused user, and questions to the user.
-Code, comments, commits, docs and memory files: written normal.
+Code, comments, commits, docs and memory files: normal style.
 Reply in the user's language.`;
 
-// Told in every voice, also "off": the shrunk tool results need it.
+// Told in every voice, also "off": the shrunk tool results need it. The footer of each shrunk
+// result repeats the id and the tool name, so this note stays short.
 export const SHRINK_NOTE = `${MARKER}
 ## Mumble: shrunk tool results
-A long tool result can show "elided (mumble)" markers and a last line with an original id. The shown part keeps the errors, the unusual entries and a summary of each elided part. Use the shown part first. If you must have more, call mumble_retrieve with that id and with grep or lines.`;
+"… N lines elided (mumble): summary …" marks a cut in a long tool result. Errors and unusual entries stay. The last line gives the id for mumble_retrieve (grep or lines) when you need the exact original.`;
 
 const TEXTS = { ste: STE, mumble: MUMBLE, ultra: ULTRA, off: "" };
 

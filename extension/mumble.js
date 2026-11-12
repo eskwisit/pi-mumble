@@ -150,7 +150,7 @@ export default function mumble(pi) {
 		// No original on disk, no shrinking: the agent must always be able to get the full text.
 		const id = store.save(text);
 		if (!id) return;
-		const footer = `\n[mumble: ${r.kind} output shrunk from ${text.length} to ${r.text.length} characters. Exact original: mumble_retrieve id ${id}]`;
+		const footer = `\n[mumble: ${r.kind} shrunk ${text.length}→${r.text.length} chars. Original: mumble_retrieve id ${id}]`;
 		const out = r.text + footer;
 		if (out.length >= text.length) return;
 		stats.shrunk += 1;
