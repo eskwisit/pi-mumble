@@ -24,6 +24,7 @@ Credit: Mumble uses code adapted from [github.com/JuliusBrussee/caveman](https:/
 2. **The agent reads less.** Before the model reads a large tool result, Mumble shrinks it by its content type. The result keeps the errors, the unusual entries, the start, the end and a summary of each removed part.
 3. **Nothing is lost.** Before Mumble shrinks a result, it writes the exact original to disk. The agent uses the `mumble_retrieve` tool to get all of it, a line range or the lines that match a regex. If Mumble cannot write the original, it does not shrink the result.
 4. **Cost counter.** Mumble counts the tokens, the cache reads, the cost and the shrink savings of the session.
+5. **The voice stays.** In a long session, the voice section is far from the newest message, and replies drift back to full prose. Mumble adds a one-line reminder of the voice to each of your messages that goes to the model, and it checks each final reply against the budget of the voice.
 
 ## Voices
 
@@ -35,6 +36,10 @@ Credit: Mumble uses code adapted from [github.com/JuliusBrussee/caveman](https:/
 | `off` | No voice rules. Only the note about shrunk results stays. | about 65 tokens |
 
 The voice text does not change from turn to turn, so the prompt cache stores it.
+
+**Reminder and check.** Each of your messages goes to the model with one line at its end, for example `[mumble] Voice ultra: fragments, no articles or filler, each fact once, no recap. Reply max 250 tokens, code apart.` The line is only in the request. The session file and the chat do not show it. A message keeps the same line in all later requests, so the prompt cache stays valid. The line costs about 30 tokens for each of your messages.
+
+After each final reply (a reply without tool calls), Mumble counts its prose tokens. Code blocks do not count. The budgets are 250 tokens for `ultra`, 400 for `mumble` and 700 for `ste`. For `ultra`, more than 1 article in 25 words also breaks the voice. When a reply breaks the voice, the line on your next message tells the model, with the numbers: `Last reply broke the voice: ~520 tokens, budget 250. Cut it.`
 
 **Why `ste` is the default.** The `mumble` voice drops articles, and `ultra` writes fragments. That breaks STE rule 4.2 ("do not omit words") and rule 4.5 ("use an article"). The `ste` voice keeps only the cuts that STE permits.
 
@@ -95,7 +100,7 @@ This test compares Mumble 0.5.0 with the upstream project, [github.com/JuliusBru
 
 | Command | Result |
 | --- | --- |
-| `/mumble` | Shows the voice, the tokens, the cache hits, the cost and the shrink savings of this session. |
+| `/mumble` | Shows the voice, the tokens, the cache hits, the cost, the shrink savings and the voice check of this session. |
 | `/mumble ste` | Sets the voice: `ste`, `mumble`, `ultra` or `off`. |
 | `/mumble mode off` | Stops all changes. `mode on` starts them again. |
 | `/mumble limit 30000` | Sets the limit for the start-and-end cut (2,000 to 200,000 characters). |
@@ -110,7 +115,7 @@ Mumble makes no network requests and runs no programs. It writes the originals t
 
 ## Limits
 
-- The model decides how well it obeys the voice rules. Mumble does not check the replies.
+- The model decides how well it obeys the voice rules. Mumble cannot change a reply after the model writes it. It checks the reply and tells the model on your next message.
 - Shorter answers can lose facts. In a test on two Google models, the `ste` voice kept 25 to 28 of 40 core facts.
 - The counter is in memory. It starts at zero in each new session.
 - The token values are estimates: 4 characters for each token.

@@ -3,6 +3,8 @@
 // 2. Read less: large tool output is shrunk by content type (JSON, logs, tables, terminal output),
 //    and the exact original stays on disk. The mumble_retrieve tool gets it back.
 // 3. Count: tokens, cache reads, cost and shrink savings of the session. /mumble shows them.
+// 4. Keep the voice: a one-line reminder on each human message sent to the model, and a check of
+//    each final reply against the budget of the voice (extension/discipline.js).
 // Credit: the design follows https://github.com/JuliusBrussee/caveman (Apache-2.0, Copyright 2026 Julius Brussee). See NOTICE.
 
 import fs from "node:fs";
@@ -10,6 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { shrink } from "./shrink.js";
 import { createStore, retrieve, sweep } from "./store.js";
+import { feedbackText, finalReplyText, measure, remind, verdict } from "./discipline.js";
 import { addToSystemPrompt } from "./system-prompt.js";
 import { VOICES, parseModeChange, section } from "./voice.js";
 
@@ -61,7 +64,7 @@ export function writeConfig(patch, file = CONFIG_FILE) {
 }
 
 export function newStats() {
-	return { turns: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, shrunk: 0, before: 0, after: 0, kinds: {}, retrieves: 0 };
+	return { turns: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, shrunk: 0, before: 0, after: 0, kinds: {}, retrieves: 0, replies: 0, broke: 0, longest: 0 };
 }
 
 export function addUsage(stats, usage) {
@@ -85,6 +88,7 @@ export function report(stats, cfg, voice) {
 		`Mumble · mode ${cfg.mode} · voice ${voice} · shrink above ${cfg.minChars}, cut above ${cfg.maxChars} characters`,
 		`Session: ${stats.turns} turns · input ${k(stats.input)} · output ${k(stats.output)} · cache read ${k(stats.cacheRead)} (${hit}%) · cache write ${k(stats.cacheWrite)} · cost $${stats.cost.toFixed(4)}`,
 		`Shrunk: ${stats.shrunk} tool results (${kinds}) · about ${k(saved)} tokens less in each later turn · ${stats.retrieves} retrieves`,
+		`Voice check: ${stats.replies} replies · ${stats.broke} broke the voice · longest ~${k(stats.longest)} tokens`,
 	].join("\n");
 }
 
@@ -110,9 +114,15 @@ export default function mumble(pi) {
 	let stats = newStats();
 	let voice = readConfig().voice;
 	let store = createStore();
+	// The reminder line each human message got when it was first sent; it never changes after.
+	let lines = new Map();
+	// The check of the last final reply; it goes on the next human message, once.
+	let pending = null;
 
 	pi.on("session_start", async () => {
 		stats = newStats();
+		lines = new Map();
+		pending = null;
 		voice = readConfig().voice;
 		store.clear();
 		store = createStore();
@@ -135,6 +145,28 @@ export default function mumble(pi) {
 		// and the prompt cache keeps only the part before the first change.
 		if (!addToSystemPrompt(payload, section(voice), "start")) return;
 		return payload;
+	});
+
+	// Request only: the session file keeps the messages as they were.
+	pi.on("context", async (event) => {
+		if (readConfig().mode === "off") return;
+		const before = lines.size;
+		const messages = remind(event?.messages, voice, lines, feedbackText(pending));
+		if (!messages) return;
+		if (lines.size > before) pending = null; // a new human message took the feedback
+		return { messages };
+	});
+
+	pi.on("message_end", async (event) => {
+		if (readConfig().mode === "off") return;
+		const text = finalReplyText(event?.message);
+		if (!text) return;
+		const m = measure(text);
+		const v = verdict(voice, m);
+		stats.replies += 1;
+		stats.longest = Math.max(stats.longest, m.tokens);
+		if (v) stats.broke += 1;
+		pending = v;
 	});
 
 	pi.on("tool_result", async (event) => {

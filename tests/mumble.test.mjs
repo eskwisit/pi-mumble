@@ -428,3 +428,69 @@ test("the name caveman appears only in credits", () => {
 		});
 	}
 });
+
+// ------------------------------------------------------------------ voice discipline
+
+const di = await load("discipline.js");
+
+test("measure and verdict: code blocks do not count; ultra flags long and article-heavy replies", () => {
+	const code = "```js\n" + "x".repeat(4000) + "\n```";
+	assert.equal(di.measure(`Done.\n${code}`).tokens, 1);
+	const long = "word ".repeat(300);
+	assert.deepEqual(di.verdict("ultra", di.measure(long)).over, true);
+	assert.equal(di.verdict("ultra", di.measure("Fixed. Tests pass.")), null);
+	const wordy = "The fix is in the file and the test covers the case of a user. ".repeat(4);
+	const v = di.verdict("ultra", di.measure(wordy));
+	assert.equal(v.over, false);
+	assert.equal(v.wordy, true);
+	assert.equal(di.verdict("mumble", di.measure(wordy)), null, "only ultra checks articles");
+	assert.equal(di.verdict("off", di.measure(long)), null);
+	assert.match(di.feedbackText(di.verdict("ultra", di.measure(long))), /~375 tokens, budget 250/);
+	assert.equal(di.feedbackText(null), "");
+});
+
+test("finalReplyText: only a reply without tool calls is checked", () => {
+	assert.equal(di.finalReplyText({ role: "assistant", content: [{ type: "text", text: "a" }, { type: "toolCall", name: "Bash" }] }), null);
+	assert.equal(di.finalReplyText({ role: "assistant", content: [{ type: "thinking", thinking: "x" }, { type: "text", text: " done " }] }), "done");
+	assert.equal(di.finalReplyText({ role: "user", content: [{ type: "text", text: "a" }] }), null);
+});
+
+test("remind: each human message gets a line that never changes; feedback goes on the newest one only", () => {
+	const lines = new Map();
+	const u1 = { role: "user", content: "fix it", timestamp: 1 };
+	const a1 = { role: "assistant", content: [{ type: "text", text: "ok" }] };
+	const tr = { role: "toolResult", content: [{ type: "text", text: "out" }] };
+	const first = di.remind([u1, a1, tr], "ultra", lines, "");
+	assert.equal(first[0].content, `fix it\n\n${di.reminderText("ultra")}`);
+	assert.equal(first[2], tr, "tool results unchanged");
+	assert.equal(u1.content, "fix it", "input not mutated");
+	const u2 = { role: "user", content: [{ type: "text", text: "and now?" }], timestamp: 2 };
+	const second = di.remind([u1, a1, u2], "ultra", lines, " Last reply broke the voice: x. Cut it.");
+	assert.equal(second[0].content, first[0].content, "old line unchanged: cache prefix stays");
+	assert.equal(second[2].content.at(-1).text, `${di.reminderText("ultra")} Last reply broke the voice: x. Cut it.`);
+	const third = di.remind([u1, a1, u2], "ultra", lines, "");
+	assert.deepEqual(third[2], second[2], "same line on every later request");
+	assert.equal(di.remind([u1], "off", new Map()), null);
+	assert.equal(di.remind([a1], "ultra", new Map()), null);
+});
+
+test("context and message_end: reminder on the request, feedback after a reply that broke the voice", async () => {
+	resetConfig();
+	ext.writeConfig({ voice: "ultra" });
+	const pi = fakePi();
+	await pi.emit("session_start", {});
+	const u1 = { role: "user", content: "go", timestamp: 1 };
+	const r1 = await pi.emit("context", { messages: [u1] });
+	assert.equal(r1.messages[0].content, `go\n\n${di.reminderText("ultra")}`);
+	await pi.emit("message_end", { message: { role: "assistant", content: [{ type: "text", text: "word ".repeat(400) }] } });
+	const u2 = { role: "user", content: "next", timestamp: 2 };
+	const r2 = await pi.emit("context", { messages: [u1, u2] });
+	assert.match(r2.messages[1].content, /Last reply broke the voice: ~500 tokens, budget 250/);
+	const u3 = { role: "user", content: "again", timestamp: 3 };
+	const r3 = await pi.emit("context", { messages: [u1, u2, u3] });
+	assert.doesNotMatch(r3.messages[2].content, /broke/, "feedback is given once");
+	assert.match(ext.report(ext.newStats(), ext.readConfig(), "ultra"), /Voice check: 0 replies/);
+	ext.writeConfig({ mode: "off" });
+	assert.equal(await pi.emit("context", { messages: [u1] }), undefined);
+	resetConfig();
+});
