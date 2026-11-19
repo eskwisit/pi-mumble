@@ -6,17 +6,18 @@
 //    a message's reminder never changes after it is first sent, so the prompt cache stays valid.
 //    Not the `context` hook: a returned message list replaces the host's messages with copies, and
 //    the host then lost its system message order (Anthropic OAuth requests failed with 429 "Error").
-// 2. Check: each final reply (no tool calls) is measured against the budget of the voice. When a reply
-//    is over the budget, the reminder on the next human message says so, with the numbers.
+// 2. Check: each final reply (no tool calls) is measured against the budget of the voice (ultra: the
+//    article rate only). When a reply breaks the voice, the reminder on the next human message says so.
 
 export const MARK = "[mumble]";
 
-// Reply budget in tokens (characters / 4), code blocks not counted. ste has no hard cap.
-export const BUDGETS = Object.freeze({ ultra: 250, mumble: 400, ste: 700 });
+// Reply budget in tokens (characters / 4), code blocks not counted. ultra has no length budget: in a
+// multi-turn tool bench (Claude Sonnet 5.5) a 250 cap gave no saving, and its length follows the content.
+export const BUDGETS = Object.freeze({ mumble: 400, ste: 700 });
 const CHARS_PER_TOKEN = 4;
 
 const REMINDERS = {
-	ultra: `${MARK} Voice ultra: fragments, no articles or filler, each fact once, no recap. Reply max ${BUDGETS.ultra} tokens, code apart.`,
+	ultra: `${MARK} Voice ultra: fragments, no articles or filler, each fact once, no recap. Length follows content.`,
 	mumble: `${MARK} Voice mumble: terse, no filler, hedging or recap. Reply max ${BUDGETS.mumble} tokens, code apart.`,
 	ste: `${MARK} Voice STE: answer first, short active sentences, no filler or recap. Reply max ${BUDGETS.ste} tokens, code apart.`,
 };
@@ -51,12 +52,13 @@ export function finalReplyText(message) {
 	return text || null;
 }
 
-// What the check found in one reply: over the budget, and for ultra too many articles (more than 1 in 25 words).
+// What the check found in one reply: over the budget (mumble, ste), or for ultra too many articles
+// (more than 1 in 15 words; 1 in 25 fired on 70% of replies in the bench).
 export function verdict(voice, m) {
+	if (!m) return null;
 	const budget = BUDGETS[voice];
-	if (!budget || !m) return null;
-	const over = m.tokens > budget;
-	const wordy = voice === "ultra" && m.words >= 40 && m.articles * 25 > m.words;
+	const over = budget !== undefined && m.tokens > budget;
+	const wordy = voice === "ultra" && m.words >= 40 && m.articles * 15 > m.words;
 	return over || wordy ? { ...m, budget, over, wordy } : null;
 }
 
