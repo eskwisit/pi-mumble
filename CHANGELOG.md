@@ -1,17 +1,12 @@
 # Changelog
 
-## 0.6.0
+## 0.6.2
 
-### Features
+### Fixes
 
-- **extension:** keep the voice in long sessions: a one-line voice reminder on each human message in the request (not stored, stable for the prompt cache), and a check of each final reply against the budget of the voice, with feedback on the next message and in `/mumble`
+- **extension:** never edit the Claude Code line of the system prompt (`b78c4af`)
+- **extension:** add the voice reminder to the request, not the context (`db0c2b2`)
 
-## 0.5.4
+### Tests
 
-### Performance
-
-- **extension:** shorter voice sections, shrink note and footer (`792cd88`)
-
-### Documentation
-
-- **readme:** update the token cost of each voice (`5e13019`)
+- cover the Claude Code line and the reminder in each payload shape (`ccd6a4e`)
