@@ -456,15 +456,18 @@ test("measure and verdict: code blocks do not count; ultra flags long and articl
 	const code = "```js\n" + "x".repeat(4000) + "\n```";
 	assert.equal(di.measure(`Done.\n${code}`).tokens, 1);
 	const long = "word ".repeat(300);
-	assert.deepEqual(di.verdict("ultra", di.measure(long)).over, true);
+	assert.equal(di.verdict("ultra", di.measure(long)), null, "ultra has no length budget");
+	assert.equal(di.verdict("mumble", di.measure("word ".repeat(400))).over, true);
 	assert.equal(di.verdict("ultra", di.measure("Fixed. Tests pass.")), null);
 	const wordy = "The fix is in the file and the test covers the case of a user. ".repeat(4);
 	const v = di.verdict("ultra", di.measure(wordy));
 	assert.equal(v.over, false);
 	assert.equal(v.wordy, true);
 	assert.equal(di.verdict("mumble", di.measure(wordy)), null, "only ultra checks articles");
+	assert.equal(di.verdict("ultra", di.measure("Fix in parser. " + "word ".repeat(17) + "the end. " + "word ".repeat(20) + "a x.")), null, "1 article in 20 words is fine");
 	assert.equal(di.verdict("off", di.measure(long)), null);
-	assert.match(di.feedbackText(di.verdict("ultra", di.measure(long))), /~375 tokens, budget 250/);
+	assert.match(di.feedbackText(di.verdict("mumble", di.measure("word ".repeat(400)))), /~500 tokens, budget 400/);
+	assert.doesNotMatch(di.reminderText("ultra"), /Reply max/);
 	assert.equal(di.feedbackText(null), "");
 });
 
@@ -516,9 +519,10 @@ test("before_provider_request and message_end: reminder on the request, feedback
 	const req = (...texts) => ({ payload: { system: "BASE", messages: texts.map((t) => ({ role: "user", content: t })) } });
 	const r1 = await pi.emit("before_provider_request", req("go"));
 	assert.equal(r1.messages[0].content, `go\n\n${di.reminderText("ultra")}`);
-	await pi.emit("message_end", { message: { role: "assistant", content: [{ type: "text", text: "word ".repeat(400) }] } });
+	const wordy = "The fix is in the file and the test covers the case of a user. ".repeat(4);
+	await pi.emit("message_end", { message: { role: "assistant", content: [{ type: "text", text: wordy }] } });
 	const r2 = await pi.emit("before_provider_request", req("go", "next"));
-	assert.match(r2.messages[1].content, /Last reply broke the voice: ~500 tokens, budget 250/);
+	assert.match(r2.messages[1].content, /Last reply broke the voice: \d+ articles in \d+ words/);
 	const r3 = await pi.emit("before_provider_request", req("go", "next", "again"));
 	assert.match(r3.messages[1].content, /broke/, "line of a message never changes");
 	assert.doesNotMatch(r3.messages[2].content, /broke/, "feedback is given once");
