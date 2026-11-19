@@ -1,9 +1,11 @@
 // Keeps the voice for the whole session. The voice section sits at the start of the system prompt,
 // far from the newest turn: in a long session with many tool calls, replies drift back to full prose.
 // Two parts, both outside the stored conversation:
-// 1. Remind: each human message that goes to the model carries a one-line reminder of the voice
-//    (the `context` hook changes only the request, not the session file). The text of a message's
-//    reminder never changes after it is first sent, so the prompt cache stays valid.
+// 1. Remind: each human message in the provider request carries a one-line reminder of the voice
+//    (before_provider_request: the session file and the host's messages do not change). The text of
+//    a message's reminder never changes after it is first sent, so the prompt cache stays valid.
+//    Not the `context` hook: a returned message list replaces the host's messages with copies, and
+//    the host then lost its system message order (Anthropic OAuth requests failed with 429 "Error").
 // 2. Check: each final reply (no tool calls) is measured against the budget of the voice. When a reply
 //    is over the budget, the reminder on the next human message says so, with the numbers.
 
@@ -70,44 +72,69 @@ export function feedbackText(v) {
 function textOf(content) {
 	if (typeof content === "string") return content;
 	if (!Array.isArray(content)) return "";
-	return content.filter((c) => c?.type === "text").map((c) => c.text ?? "").join("\n");
+	return content.filter((c) => typeof c?.text === "string" && (c.type === undefined || c.type === "text" || c.type === "input_text")).map((c) => c.text).join("\n");
 }
 
-// A stable key for a human message: its time when it has one, else its position and text.
-export function messageKey(message, index) {
-	if (message?.timestamp != null) return `t:${message.timestamp}`;
-	const text = textOf(message?.content);
+// Tool results that providers send in a user message: Anthropic tool_result, Gemini functionResponse.
+const TOOL_PART = (c) => c?.type === "tool_result" || c?.functionResponse !== undefined;
+
+// The human messages of a provider payload, with the key of their content array or string.
+// Anthropic and OpenAI Chat: messages[] (content); OpenAI Responses: input[] (content);
+// Gemini: contents[] (parts). OpenAI tool results have their own role or type, not user.
+function humanMessages(payload) {
+	const out = [];
+	for (const [list, field] of [["messages", "content"], ["input", "content"], ["contents", "parts"]]) {
+		const items = payload?.[list];
+		if (!Array.isArray(items)) continue;
+		for (const m of items) {
+			if (m?.role !== "user") continue;
+			const content = m[field];
+			if (Array.isArray(content) ? content.some(TOOL_PART) : typeof content !== "string") continue;
+			out.push({ message: m, field });
+		}
+	}
+	return out;
+}
+
+// A stable key for a human message: its position among human messages and a hash of its text.
+export function messageKey(text, index) {
 	let h = 0;
 	for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0;
-	return `i:${index}:${text.length}:${h}`;
+	return `${index}:${text.length}:${h}`;
 }
 
-function withLine(content, line) {
+function withLine(content, line, field) {
 	if (typeof content === "string") return `${content}\n\n${line}`;
-	if (Array.isArray(content)) return [...content, { type: "text", text: line }];
-	return content;
+	if (field === "parts") return [...content, { text: line }];
+	const type = content.some((c) => c?.type === "input_text") ? "input_text" : "text";
+	return [...content, { type, text: line }];
 }
 
-// The messages with a reminder on each human message. `lines` maps a message key to the line it got
-// the first time; a message seen for the first time gets the base reminder, and the newest one also
-// gets `feedback`. Returns null when nothing changes.
-export function remind(messages, voice, lines, feedback = "") {
+/**
+ * Adds a reminder line to each human message of a provider request, in place. `lines` maps a message
+ * key to the line it got the first time; a message seen for the first time gets the base reminder,
+ * and the newest one also gets `feedback`.
+ * @returns {{ changed: boolean, fresh: boolean }} changed: a line was added; fresh: a new human
+ *   message took its first line (the feedback is used)
+ */
+export function remind(payload, voice, lines, feedback = "") {
 	const base = reminderText(voice);
-	if (!base || !Array.isArray(messages)) return null;
-	let lastHuman = -1;
-	messages.forEach((m, i) => {
-		if (m?.role === "user") lastHuman = i;
-	});
-	if (lastHuman < 0) return null;
-	return messages.map((m, i) => {
-		if (m?.role !== "user") return m;
-		const key = messageKey(m, i);
+	if (!base || !payload || typeof payload !== "object") return { changed: false, fresh: false };
+	const humans = humanMessages(payload);
+	let fresh = false;
+	let changed = false;
+	humans.forEach(({ message, field }, i) => {
+		const text = textOf(message[field]);
+		if (text.includes(MARK)) return;
+		const key = messageKey(text, i);
 		let line = lines.get(key);
 		if (line === undefined) {
-			line = i === lastHuman ? base + feedback : base;
+			line = i === humans.length - 1 ? base + feedback : base;
 			lines.set(key, line);
+			fresh = true;
 		}
-		if (textOf(m.content).includes(MARK)) return m;
-		return { ...m, content: withLine(m.content, line) };
+		message[field] = withLine(message[field], line, field);
+		changed = true;
 	});
+	return { changed, fresh };
 }

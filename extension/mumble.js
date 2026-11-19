@@ -3,7 +3,7 @@
 // 2. Read less: large tool output is shrunk by content type (JSON, logs, tables, terminal output),
 //    and the exact original stays on disk. The mumble_retrieve tool gets it back.
 // 3. Count: tokens, cache reads, cost and shrink savings of the session. /mumble shows them.
-// 4. Keep the voice: a one-line reminder on each human message sent to the model, and a check of
+// 4. Keep the voice: a one-line reminder on each human message of each provider request, and a check of
 //    each final reply against the budget of the voice (extension/discipline.js).
 // Credit: the design follows https://github.com/JuliusBrussee/caveman (Apache-2.0, Copyright 2026 Julius Brussee). See NOTICE.
 
@@ -143,18 +143,11 @@ export default function mumble(pi) {
 		const payload = event?.payload;
 		// At the start, not the end: the host changes later parts of its prompt during a session,
 		// and the prompt cache keeps only the part before the first change.
-		if (!addToSystemPrompt(payload, section(voice), "start")) return;
-		return payload;
-	});
-
-	// Request only: the session file keeps the messages as they were.
-	pi.on("context", async (event) => {
-		if (readConfig().mode === "off") return;
-		const before = lines.size;
-		const messages = remind(event?.messages, voice, lines, feedbackText(pending));
-		if (!messages) return;
-		if (lines.size > before) pending = null; // a new human message took the feedback
-		return { messages };
+		const added = addToSystemPrompt(payload, section(voice), "start");
+		// Reminder lines on the human messages of this request only (see extension/discipline.js).
+		const reminded = remind(payload, voice, lines, feedbackText(pending));
+		if (reminded.fresh) pending = null;
+		return added || reminded.changed ? payload : undefined;
 	});
 
 	pi.on("message_end", async (event) => {
