@@ -49,7 +49,7 @@ function fakePi() {
 		registerCommand: (name, spec) => commands.set(name, spec),
 		registerTool: (spec) => tools.set(spec.name, spec),
 	});
-	return { emit: (name, event) => handlers.get(name)(event, {}), commands, tools };
+	return { emit: (name, event) => handlers.get(name)(event, {}), handlers, commands, tools };
 }
 
 const resetConfig = () => fs.rmSync(ext.CONFIG_FILE, { force: true });
@@ -309,8 +309,26 @@ test("before_provider_request: puts the section at the start of the PI-Desktop p
 	await pi.emit("before_provider_request", { payload: mid });
 	assert.equal(mid.system, `${s}\n\nBASE`);
 	assert.equal(mid.messages[0].content[0].text, "UPDATE");
-	assert.equal(await pi.emit("before_provider_request", { payload: { messages: [{ role: "user", content: "hi" }] } }), undefined);
+	assert.equal(await pi.emit("before_provider_request", { payload: { messages: [{ role: "assistant", content: "hi" }] } }), undefined);
 	assert.equal(await pi.emit("before_provider_request", {}), undefined);
+});
+
+test("before_provider_request: never edits the Claude Code line (Anthropic OAuth gate, 429 \"Error\")", async () => {
+	resetConfig();
+	const pi = fakePi();
+	const s = vo.section("ste");
+	const cc = { type: "text", text: sp.CLAUDE_CODE_LINE, cache_control: { type: "ephemeral" } };
+	// The host sends the Claude Code line alone when its system message is not first.
+	const payload = { system: [{ ...cc }], messages: [{ role: "user", content: "hi" }] };
+	await pi.emit("before_provider_request", { payload });
+	assert.equal(payload.system[0].text, sp.CLAUDE_CODE_LINE);
+	assert.deepEqual(payload.system[1], { type: "text", text: s, cache_control: { type: "ephemeral" } });
+	await pi.emit("before_provider_request", { payload });
+	assert.equal(payload.system.length, 2, "a retry does not add it twice");
+	const two = { system: [{ ...cc }, { type: "text", text: "BASE" }], messages: [] };
+	await pi.emit("before_provider_request", { payload: two });
+	assert.equal(two.system[0].text, sp.CLAUDE_CODE_LINE);
+	assert.equal(two.system[1].text, `${s}\n\nBASE`);
 });
 
 test("addToSystemPrompt: each provider payload shape", async () => {
@@ -432,6 +450,7 @@ test("the name caveman appears only in credits", () => {
 // ------------------------------------------------------------------ voice discipline
 
 const di = await load("discipline.js");
+const sp = await load("system-prompt.js");
 
 test("measure and verdict: code blocks do not count; ultra flags long and article-heavy replies", () => {
 	const code = "```js\n" + "x".repeat(4000) + "\n```";
@@ -457,40 +476,54 @@ test("finalReplyText: only a reply without tool calls is checked", () => {
 
 test("remind: each human message gets a line that never changes; feedback goes on the newest one only", () => {
 	const lines = new Map();
-	const u1 = { role: "user", content: "fix it", timestamp: 1 };
-	const a1 = { role: "assistant", content: [{ type: "text", text: "ok" }] };
-	const tr = { role: "toolResult", content: [{ type: "text", text: "out" }] };
-	const first = di.remind([u1, a1, tr], "ultra", lines, "");
-	assert.equal(first[0].content, `fix it\n\n${di.reminderText("ultra")}`);
-	assert.equal(first[2], tr, "tool results unchanged");
-	assert.equal(u1.content, "fix it", "input not mutated");
-	const u2 = { role: "user", content: [{ type: "text", text: "and now?" }], timestamp: 2 };
-	const second = di.remind([u1, a1, u2], "ultra", lines, " Last reply broke the voice: x. Cut it.");
-	assert.equal(second[0].content, first[0].content, "old line unchanged: cache prefix stays");
-	assert.equal(second[2].content.at(-1).text, `${di.reminderText("ultra")} Last reply broke the voice: x. Cut it.`);
-	const third = di.remind([u1, a1, u2], "ultra", lines, "");
-	assert.deepEqual(third[2], second[2], "same line on every later request");
-	assert.equal(di.remind([u1], "off", new Map()), null);
-	assert.equal(di.remind([a1], "ultra", new Map()), null);
+	const fb = " Last reply broke the voice: x. Cut it.";
+	const req = (...extra) => ({
+		messages: [
+			{ role: "user", content: "fix it" },
+			{ role: "assistant", content: [{ type: "tool_use", id: "t1" }] },
+			{ role: "user", content: [{ type: "tool_result", tool_use_id: "t1", content: "out" }] },
+			...extra,
+		],
+	});
+	const first = req();
+	assert.deepEqual(di.remind(first, "ultra", lines, ""), { changed: true, fresh: true });
+	assert.equal(first.messages[0].content, `fix it\n\n${di.reminderText("ultra")}`);
+	assert.equal(first.messages[2].content.length, 1, "tool results unchanged");
+	const u2 = () => ({ role: "user", content: [{ type: "text", text: "and now?" }] });
+	const second = req(u2());
+	assert.deepEqual(di.remind(second, "ultra", lines, fb), { changed: true, fresh: true });
+	assert.equal(second.messages[0].content, first.messages[0].content, "old line unchanged: cache prefix stays");
+	assert.equal(second.messages[3].content.at(-1).text, `${di.reminderText("ultra")}${fb}`);
+	const third = req(u2());
+	assert.deepEqual(di.remind(third, "ultra", lines, ""), { changed: true, fresh: false });
+	assert.deepEqual(third, second, "same lines on every later request");
+	// OpenAI Responses and Gemini shapes.
+	const resp = { input: [{ role: "user", content: [{ type: "input_text", text: "q" }] }, { type: "function_call_output", output: "x" }] };
+	di.remind(resp, "ste", new Map());
+	assert.equal(resp.input[0].content[1].type, "input_text");
+	const gem = { contents: [{ role: "user", parts: [{ text: "q" }] }, { role: "user", parts: [{ functionResponse: {} }] }] };
+	di.remind(gem, "ste", new Map());
+	assert.deepEqual(gem.contents[0].parts[1], { text: di.reminderText("ste") });
+	assert.equal(gem.contents[1].parts.length, 1);
+	assert.equal(di.remind(req(), "off", new Map()).changed, false);
 });
 
-test("context and message_end: reminder on the request, feedback after a reply that broke the voice", async () => {
+test("before_provider_request and message_end: reminder on the request, feedback after a reply that broke the voice", async () => {
 	resetConfig();
 	ext.writeConfig({ voice: "ultra" });
 	const pi = fakePi();
 	await pi.emit("session_start", {});
-	const u1 = { role: "user", content: "go", timestamp: 1 };
-	const r1 = await pi.emit("context", { messages: [u1] });
+	const req = (...texts) => ({ payload: { system: "BASE", messages: texts.map((t) => ({ role: "user", content: t })) } });
+	const r1 = await pi.emit("before_provider_request", req("go"));
 	assert.equal(r1.messages[0].content, `go\n\n${di.reminderText("ultra")}`);
 	await pi.emit("message_end", { message: { role: "assistant", content: [{ type: "text", text: "word ".repeat(400) }] } });
-	const u2 = { role: "user", content: "next", timestamp: 2 };
-	const r2 = await pi.emit("context", { messages: [u1, u2] });
+	const r2 = await pi.emit("before_provider_request", req("go", "next"));
 	assert.match(r2.messages[1].content, /Last reply broke the voice: ~500 tokens, budget 250/);
-	const u3 = { role: "user", content: "again", timestamp: 3 };
-	const r3 = await pi.emit("context", { messages: [u1, u2, u3] });
+	const r3 = await pi.emit("before_provider_request", req("go", "next", "again"));
+	assert.match(r3.messages[1].content, /broke/, "line of a message never changes");
 	assert.doesNotMatch(r3.messages[2].content, /broke/, "feedback is given once");
-	assert.match(ext.report(ext.newStats(), ext.readConfig(), "ultra"), /Voice check: 0 replies/);
+	assert.equal(pi.handlers.has("context"), false, "no context hook: it made the host lose its system message order");
 	ext.writeConfig({ mode: "off" });
-	assert.equal(await pi.emit("context", { messages: [u1] }), undefined);
+	assert.equal(await pi.emit("before_provider_request", req("go")), undefined);
 	resetConfig();
 });
