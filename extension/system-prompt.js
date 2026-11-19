@@ -32,9 +32,23 @@ function addTo(holder, key, section, at) {
 	if (!parts.length) return false;
 	if (parts.some((p) => p.text.includes(section))) return true;
 	// The last text part: the PI-Desktop prompt, also when a provider puts a fixed line before it.
+	// Never the Claude Code line: with OAuth, Anthropic refuses a request whose first system block is
+	// not that line verbatim (429 rate_limit_error "Error"). When the host sends that line alone (no
+	// PI-Desktop prompt block, e.g. its system message is not first), the section goes in a new block.
 	const part = parts[parts.length - 1];
+	if (isClaudeCodeLine(part.text)) {
+		const { cache_control } = part;
+		value.splice(value.indexOf(part) + 1, 0, { type: "text", text: section, ...(cache_control ? { cache_control } : {}) });
+		return true;
+	}
 	part.text = join(part.text, section, at);
 	return true;
+}
+
+export const CLAUDE_CODE_LINE = "You are Claude Code, Anthropic's official CLI for Claude.";
+
+function isClaudeCodeLine(text) {
+	return text.trim() === CLAUDE_CODE_LINE;
 }
 
 /**
