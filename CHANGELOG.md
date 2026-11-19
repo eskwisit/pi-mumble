@@ -1,12 +1,16 @@
 # Changelog
 
-## 0.6.2
+## 0.6.3
 
 ### Fixes
 
-- **extension:** never edit the Claude Code line of the system prompt (`b78c4af`)
-- **extension:** add the voice reminder to the request, not the context (`db0c2b2`)
+- **extension:** drop the ultra length budget and loosen its article check (`19f238f`)
+
+### Documentation
+
+- **manifest:** describe the ultra article check in the safety notes (`f7339ff`)
+- **readme:** explain why ultra has no length budget (`fdf1f0c`)
 
 ### Tests
 
-- cover the Claude Code line and the reminder in each payload shape (`ccd6a4e`)
+- **tests:** cover ultra without length budget and the 1-in-15 article rule (`edc904a`)
