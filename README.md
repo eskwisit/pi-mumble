@@ -37,9 +37,9 @@ Credit: Mumble uses code adapted from [github.com/JuliusBrussee/caveman](https:/
 
 The voice text does not change from turn to turn, so the prompt cache stores it.
 
-**Reminder and check.** Each of your messages goes to the model with one line at its end, for example `[mumble] Voice ultra: fragments, no articles or filler, each fact once, no recap. Reply max 250 tokens, code apart.` The line is only in the request. The session file and the chat do not show it. A message keeps the same line in all later requests, so the prompt cache stays valid. The line costs about 30 tokens for each of your messages.
+**Reminder and check.** Each of your messages goes to the model with one line at its end, for example `[mumble] Voice ultra: fragments, no articles or filler, each fact once, no recap. Length follows content.` The line is only in the request. The session file and the chat do not show it. A message keeps the same line in all later requests, so the prompt cache stays valid. The line costs about 30 tokens for each of your messages.
 
-After each final reply (a reply without tool calls), Mumble counts its prose tokens. Code blocks do not count. The budgets are 250 tokens for `ultra`, 400 for `mumble` and 700 for `ste`. For `ultra`, more than 1 article in 25 words also breaks the voice. When a reply breaks the voice, the line on your next message tells the model, with the numbers: `Last reply broke the voice: ~520 tokens, budget 250. Cut it.`
+After each final reply (a reply without tool calls), Mumble counts its prose tokens. Code blocks do not count. The budgets are 400 tokens for `mumble` and 700 for `ste`. `ultra` has no length budget: in a multi-turn test with tools, a 250-token budget saved nothing. For `ultra`, more than 1 article in 15 words breaks the voice. When a reply breaks the voice, the line on your next message tells the model, with the numbers: `Last reply broke the voice: ~520 tokens, budget 400. Cut it.`
 
 **Why `ste` is the default.** The `mumble` voice drops articles, and `ultra` writes fragments. That breaks STE rule 4.2 ("do not omit words") and rule 4.5 ("use an article"). The `ste` voice keeps only the cuts that STE permits.
 
